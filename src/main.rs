@@ -1,3 +1,5 @@
+slint::include_modules!();
+
 fn main() {
     use slint::Model;
 
@@ -11,86 +13,37 @@ fn main() {
     tiles.shuffle(&mut rng);
 
     let tiles_model = std::rc::Rc::new(slint::VecModel::from(tiles));
-    main_window.set_memory_tiles(tiles_model.into());
+    main_window.set_memory_tiles(tiles_model.clone().into());
+
+    let main_window_weak = main_window.as_weak();
+
+    main_window.on_check_if_pair_solved(move || {
+        let mut flipped_tiles = tiles_model.iter().enumerate().filter(|(_, tile)| tile.image_visible && !tile.solved);
+
+        if let (Some((t1_idx, mut t1)), Some((t2_idx, mut t2))) = (flipped_tiles.next(), flipped_tiles.next()) {
+            let is_pair_solved = t1 == t2;
+
+            if is_pair_solved {
+                t1.solved = true;
+                tiles_model.set_row_data(t1_idx, t1);
+                t2.solved = true;
+                tiles_model.set_row_data(t2_idx, t2);
+            } else {
+                let main_window = main_window_weak.unwrap();
+                main_window.set_disable_tiles(true);
+                let tiles_model = tiles_model.clone();
+
+                slint::Timer::single_shot(std::time::Duration::from_secs(1), move || {
+                    main_window.set_disable_tiles(false);
+
+                    t1.image_visible = false;
+                    tiles_model.set_row_data(t1_idx, t1);
+                    t2.image_visible = false;
+                    tiles_model.set_row_data(t2_idx, t2);
+                });
+            }
+        }
+    });
 
     main_window.run().unwrap();
-}
-
-slint::slint! {
-    struct TileData {
-        image: image,
-        image_visible: bool,
-        solved: bool,
-    }
-    component MemoryTile inherits Rectangle {
-        callback clicked;
-        in property <bool> open_curtain;
-        in property <bool> solved;
-        in property <image> icon;
-
-        width: 128px;
-        height: 128px;
-        background: solved ? #0083fd : #74c8f0;
-        animate background { duration: 800ms; }
-
-        Image {
-            source: icon;
-            width: parent.width;
-            height: parent.height;
-        }
-
-        //Left curtain
-        Rectangle {
-            background: #3157c9;
-            x: 0px;
-            width: open_curtain ? 0px : (parent.width / 2);
-            height: parent.height;
-            animate width {duration: 250ms; easing: ease-in;}
-        }
-
-        //Right curtain
-        Rectangle {
-            background: #3157c9;
-            x: open-curtain ? parent.width : (parent.width / 2);
-            width: open-curtain ? 0px : (parent.width / 2);
-            height: parent.height;
-            animate width { duration: 250ms; easing: ease-in; }
-            animate x { duration: 250ms; easing: ease-in; }
-        }
-
-        TouchArea {
-            clicked => {
-                root.clicked();
-            }
-        }
-    }
-    export component MainWindow inherits Window {
-        width: 720px;
-        height: 720px;
-
-        in property <[TileData]> memory_tiles: [
-            {image: @image-url("icons/bank.png")},
-            {image: @image-url("icons/bus.png")},
-            {image: @image-url("icons/fish.png")},
-            {image: @image-url("icons/love.png")},
-            {image: @image-url("icons/gift.png")},
-            {image: @image-url("icons/usd.png")},
-            {image: @image-url("icons/rocket.png")},
-            {image: @image-url("icons/woman.png")},
-        ];
-
-        for tile[i] in memory-tiles : MemoryTile {
-            x: mod(i, 4) * 136px;
-            y: floor(i / 4) * 136px;
-            width: 128px;
-            height: 128px;
-            icon: tile.image;
-            open-curtain: tile.image-visible || tile.solved;
-            solved: tile.solved;
-
-            clicked => {
-                tile.image-visible = !tile.image_visible;
-            }
-        }
-    }
 }
