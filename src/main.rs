@@ -3,15 +3,20 @@ fn main() {
 }
 
 slint::slint! {
+    struct TileData {
+        image: image,
+        image_visible: bool,
+        solved: bool,
+    }
     component MemoryTile inherits Rectangle {
         callback clicked;
         in property <bool> open_curtain;
         in property <bool> solved;
         in property <image> icon;
 
-        width: 64px;
-        height: 64px;
-        background: solved ? #0043fd : #74c8f0;
+        width: 128px;
+        height: 128px;
+        background: solved ? #0083fd : #74c8f0;
         animate background { duration: 800ms; }
 
         Image {
@@ -46,10 +51,31 @@ slint::slint! {
         }
     }
     export component MainWindow inherits Window {
-        MemoryTile {
-            icon: @image-url("icons/bus.png");
+        width: 720px;
+        height: 720px;
+
+        in property <[TileData]> memory_tiles: [
+            {image: @image-url("icons/bank.png")},
+            {image: @image-url("icons/bus.png")},
+            {image: @image-url("icons/fish.png")},
+            {image: @image-url("icons/love.png")},
+            {image: @image-url("icons/gift.png")},
+            {image: @image-url("icons/usd.png")},
+            {image: @image-url("icons/rocket.png")},
+            {image: @image-url("icons/woman.png")},
+        ];
+
+        for tile[i] in memory-tiles : MemoryTile {
+            x: mod(i, 4) * 136px;
+            y: floor(i / 4) * 136px;
+            width: 128px;
+            height: 128px;
+            icon: tile.image;
+            open-curtain: tile.image-visible || tile.solved;
+            solved: tile.solved;
+
             clicked => {
-                self.open_curtain = !self.open_curtain;
+                tile.image-visible = !tile.image_visible;
             }
         }
     }
